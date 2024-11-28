@@ -1,0 +1,62 @@
+---
+title: "Final Project"
+author: "Tourigny, Timmy; Misiorek, Ty; Chandra, Amav"
+date: 'Dec 6, 2024'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+**APMA 3150 \| Fall 2024 \| University of Virginia**
+
+***"On my honor, I pledge that I have neither given nor received unauthorized aid on this assignment." - The author of this RMarkdown file.***
+
+<!--- Solution Region --->
+
+```{css solution-region, echo=FALSE}
+.solution {
+    background-color: #232D4B10;
+    border-style: solid;
+    border-color: #232D4B;
+    padding: .5em;
+    margin: 20px
+}
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+# [Analysis]{style="color:#FF7F50"}
+
+Data Retrieval
+
+```{r}
+
+#remember to set working directory
+data <- read.csv("death-rates-from-air-pollution.csv")
+# Rename columns for simplicity
+colnames(data) <- c("Entity", "Code", "Year", "Total_Deaths", "Indoor_Deaths", "Outdoor_PM_Deaths", "Outdoor_Ozone_Deaths")
+
+
+```
+
+Analysis One
+
+```{r}
+
+
+
+
+```
+
+
+
+
