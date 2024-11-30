@@ -558,3 +558,29 @@ boxplot(Slope ~ Cluster, data = slopes,
 
 
 ```
+
+
+``{r}
+
+risk_factors <- cluster_1_data %>%
+  group_by(Status) %>%
+  summarize(
+    Avg_Indoor_Deaths = mean(Indoor_Deaths, na.rm = TRUE),
+    Avg_Outdoor_PM_Deaths = mean(Outdoor_PM_Deaths, na.rm = TRUE),
+    Avg_Outdoor_Ozone_Deaths = mean(Outdoor_Ozone_Deaths, na.rm = TRUE)
+  )
+print(risk_factors)
+
+data$In_Cluster_1 <- ifelse(data$Cluster == "1", 1, 0)
+
+
+lr_model <- glm(In_Cluster_1 ~ Indoor_Deaths + Outdoor_PM_Deaths + Outdoor_Ozone_Deaths + Status,
+                   data = data, family = binomial)
+summary(lr_model)
+```
+
+Looking at the results from the logistic regression:
+Indoor related deaths: for every 1-unit increase in indoor deaths per 100,000, log odds of being in the 1st cluster increases by 0.2123
+Outdoor related deaths: For every 1-unit increase in outdoor deaths, odds of being in cluster 1 decrease by 0.146
+Ozone: for every 1-unit increase, the log odds of being in cluster 1 decrease by .736
+Developing: The odds of being in cluster 1 for a developing country are 2.11 times higher than for developed countries (e^.747..= 2.111)
