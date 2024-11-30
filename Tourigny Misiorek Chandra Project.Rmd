@@ -346,6 +346,8 @@ for (country in upward_countries) {
 
 ```
 
+
+
 ```{r}
 
 # Set parameters for permutation
@@ -410,5 +412,149 @@ p_values <- sapply(1:3, function(j) {
 names(p_values) <- c("Indoor", "PM", "Ozone")
 print("P-values from Permutation Test:")
 print(p_values)
+
+```
+
+```{r}
+most_pollution_deaths <- data %>%
+  group_by(Entity) %>%
+  summarize(
+    Total_Deaths_Sum = sum(Total_Deaths, na.rm = TRUE)
+  ) %>%
+  arrange(desc(Total_Deaths_Sum))
+
+#top 10 countries with the most pollution deaths
+head(most_pollution_deaths, 10)
+
+```
+
+9/10 of these countries are considered to be developing countries (all except oceania, which is not really a country but a region)
+
+Now want to look at whether we can see some sort of similarities in the stats between these countries
+
+```{r}
+cluster_features <- data[, c("Indoor_Deaths", "Outdoor_PM_Deaths", "Outdoor_Ozone_Deaths")]
+
+cluster_features <- na.omit(cluster_features)
+
+cluster_features_scaled <- scale(cluster_features)
+
+set.seed(123)  # For reproducibility
+kmeans_result <- kmeans(cluster_features_scaled, centers = 3)
+
+data$Cluster <- NA
+data$Cluster[complete.cases(data[, c("Indoor_Deaths", "Outdoor_PM_Deaths", "Outdoor_Ozone_Deaths")])] <- kmeans_result$cluster
+
+table(data$Entity, data$Cluster)
+
+cluster_summary <- aggregate(
+  cluster_features, 
+  by = list(Cluster = kmeans_result$cluster), 
+  mean
+)
+
+cluster_summary
+
+```
+
+
+
+```{r}
+developing_countries <- c(
+  "Afghanistan", "Angola", "Bangladesh", "Benin", "Bhutan", 
+  "Bolivia", "Botswana", "Burkina Faso", "Burundi", "Cambodia", 
+  "Cameroon", "Central African Republic", "Chad", "Comoros", 
+  "Congo", "Cote d'Ivoire", "Democratic Republic of Congo", "Djibouti", 
+  "Eritrea", "Ethiopia", "Gambia", "Ghana", "Guatemala", "Guinea", 
+  "Guinea-Bissau", "Haiti", "Honduras", "India", "Indonesia", 
+  "Kenya", "Kiribati", "Kyrgyzstan", "Laos", "Lesotho", "Liberia", 
+  "Madagascar", "Malawi", "Mali", "Mauritania", "Micronesia (country)", 
+  "Moldova", "Mozambique", "Myanmar", "Namibia", "Nepal", 
+  "Nicaragua", "Niger", "Nigeria", "Pakistan", "Papua New Guinea", 
+  "Philippines", "Rwanda", "Samoa", "Sao Tome and Principe", "Senegal", 
+  "Sierra Leone", "Solomon Islands", "Somalia", "South Sudan", 
+  "Sudan", "Swaziland", "Tajikistan", "Tanzania", "Timor", 
+  "Togo", "Uganda", "Uzbekistan", "Vanuatu", "Vietnam", "Yemen", 
+  "Zambia", "Zimbabwe"
+)
+
+developing_cluster_counts <- table(factor(
+  data$Cluster[!is.na(data$Cluster) & data$Entity %in% developing_countries],
+  levels = unique(data$Cluster)
+))
+
+total_cluster_counts <- table(factor(
+  data$Cluster[!is.na(data$Cluster)],
+  levels = unique(data$Cluster)
+))
+
+table <- rbind(
+  Developing = developing_cluster_counts,
+  Non_Developing = total_cluster_counts - developing_cluster_counts
+)
+
+table
+chi_square_test <- chisq.test(table)
+
+chi_square_test
+```
+Looking at the clustering results, we see that generally developing countries were placed into cluster 1, which is higher amounts of indoor pollution related deaths. Running a chi-squared test on this clustering statistics, we get a p-value of 2.2*10^-6, which is smaller than the significance level 0.05, and thus, we can conclude that the clustering of countries is not independent on whether they are developing or non-developing.
+
+```{r}
+data$Cluster <- as.factor(data$Cluster)
+anova_deaths <- aov(Total_Deaths ~ Cluster, data = data)
+summary(anova_deaths)
+
+tukey_deaths <- TukeyHSD(anova_deaths)
+print(tukey_deaths)
+
+boxplot(Total_Deaths ~ Cluster, data = data,
+        main = "Comparison of Total Deaths by Cluster",
+        xlab = "Cluster",
+        ylab = "Total Deaths (per 100k)",
+        col = c("blue", "green", "red"))
+```
+
+Here we can see how much more deaths in cluster 1 there are than the others. Thus indoor-related pollution seems to be much more deadly.
+
+```{r}
+data$Cluster <- as.factor(data$Cluster)
+data$Status <- ifelse(data$Entity %in% developing_countries, "Developing", "Developed")
+
+cluster_1_data <- subset(data, Cluster == "1")
+
+boxplot(Total_Deaths ~ Status, data = cluster_1_data,
+        main = "Total Deaths in Cluster 1: Developing vs. Developed",
+        xlab = "Country Type",
+        ylab = "Total Deaths (per 100k)",
+        col = c("red", "blue"))
+```
+
+However, if we compare the total amount of deaths within cluster 1 by the developed vs developing countries, we see relatively close averages, although the developing countries has significantly more outliers.
+
+
+```{r}
+
+slopes <- data %>%
+  group_by(Entity) %>%
+  summarize(
+    Cluster = first(Cluster), 
+    Slope = coef(lm(Total_Deaths ~ Year))[2]  
+  )
+
+
+anova_slopes <- aov(Slope ~ Cluster, data = slopes)
+summary(anova_slopes)
+
+tukey_slopes <- TukeyHSD(anova_slopes)
+print(tukey_slopes)
+
+
+boxplot(Slope ~ Cluster, data = slopes,
+        main = "Comparison of Decrease in Deaths Over Time by Cluster",
+        xlab = "Cluster",
+        ylab = "Slope (Change in Deaths per Year)",
+        col = c("blue", "green", "red"))
+
 
 ```
