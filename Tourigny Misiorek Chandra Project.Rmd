@@ -39,6 +39,8 @@ knitr::opts_chunk$set(echo = TRUE)
 Data Retrieval
 
 ```{r}
+library(ggplot2)
+library(dplyr)
 
 #remember to set working directory
 data <- read.csv("death-rates-from-air-pollution.csv")
@@ -48,11 +50,40 @@ colnames(data) <- c("Entity", "Code", "Year", "Total_Deaths", "Indoor_Deaths", "
 
 ```
 
-Analysis One
 
 ```{r}
+aggregated_data <- aggregate(
+  cbind(Total_Deaths, Indoor_Deaths, Outdoor_PM_Deaths, Outdoor_Ozone_Deaths) ~ Year,
+  data = data,
+  sum,
+  na.rm = TRUE
+)
 
+plot(aggregated_data$Year, aggregated_data$Total_Deaths,
+     type = "l",
+     col = "blue",
+     lwd = 2,
+     xlab = "Year",
+     ylab = "Total Deaths (per 100,000 people)",
+     main = "Global Trend of Total Deaths Due to Air Pollution (1990-2017)"
+)
 
+plot(aggregated_data$Year, aggregated_data$Indoor_Deaths,
+     type = "l",
+     col = "red",
+     lwd = 2,
+     xlab = "Year",
+     ylab = "Deaths (per 100,000 people)",
+     main = "Global Trends of Air Pollution Deaths by Type (1990-2017)"
+)
+lines(aggregated_data$Year, aggregated_data$Outdoor_PM_Deaths, col = "green", lwd = 2)
+lines(aggregated_data$Year, aggregated_data$Outdoor_Ozone_Deaths, col = "blue", lwd = 2)
+
+legend("topright",
+       legend = c("Indoor Pollution", "Outdoor PM Pollution", "Outdoor Ozone Pollution"),
+       col = c("red", "green", "blue"),
+       lwd = 2,
+       bty = "n")
 
 
 ```
@@ -60,3 +91,324 @@ Analysis One
 
 
 
+```{r}
+#plotting number of deaths (per 100k people) by year for a select few countries to see how trends changed throughout different regions and if we see that
+#most regions are pretty similar to each other or if they are kind of independent
+
+countries <- c("United States", "Afghanistan", "China", "United Arab Emirates")
+
+for (country in countries) {
+  country_data <- data[data$Entity == country, ]
+  
+  plot(
+    country_data$Year, country_data$Total_Deaths, 
+    type = "o",
+    col = "blue",
+    pch = 16,
+    lwd = 2,
+    xlab = "Year", 
+    ylab = "Total Deaths (per 100,000)",
+    main = paste("Total Deaths Due to Pollution in", country),
+    cex.main = 1.5,
+    cex.lab = 1.2,  
+    cex.axis = 1 
+  )
+}
+```
+
+```{r}
+#From the first couple of countries we looked at, we observed a downwards trend in deaths, so now lets see if we can identify any upwards trending countries. Also determine what the average change in deaths is in the dataset so we can compare these against the average
+
+unique_countries <- unique(data$Entity)
+slopes <- numeric(length(unique_countries))
+sum_slopes <- 0
+count_slopes <- 0
+
+for (i in seq_along(unique_countries)) {
+  country_data <- data[data$Entity == unique_countries[i], ]
+  
+  # Fit a linear regression if there is sufficient data
+  if (nrow(country_data) > 1) {
+    model <- lm(Total_Deaths ~ Year, data = country_data)
+    slopes[i] <- coef(model)["Year"]
+    sum_slopes <- sum_slopes + slopes[i]
+    count_slopes <- count_slopes + 1
+  } else {
+    slopes[i] <- NA
+  }
+}
+
+#identify upward trending countries
+results <- data.frame(Country = unique_countries, Slope = slopes)
+upward_trend <- results[results$Slope > 0, ]
+upward_trend <- upward_trend[order(-upward_trend$Slope), ]
+
+#create averages
+average_slope <- sum_slopes / count_slopes
+
+upward_trend
+cat("Average Slope:", average_slope)
+```
+The average slope of the deaths is -1.612, which is very different from the five we identified with a positive slope. Calculate some z-scores to see how different these are from the mean
+```{r}
+valid_slopes <- slopes[!is.na(slopes)]
+mean_slope <- mean(valid_slopes)
+sd_slope <- sd(valid_slopes)
+
+upward_trend$Z_Score <- (upward_trend$Slope - mean_slope) / sd_slope
+
+cat("Average Slope:", mean_slope, "\n")
+cat("Standard Deviation of Slopes:", sd_slope, "\n")
+upward_trend
+```
+
+Check for normality with a qqplot:
+```{r}
+qqnorm(valid_slopes, main = "QQ Plot of Slopes")
+qqline(valid_slopes, col = "red", lwd = 2)
+
+hist(valid_slopes, breaks = 20, probability = TRUE, 
+     main = "Histogram of Slopes", 
+     xlab = "Slopes", 
+     col = "green", 
+     border = "black")
+lines(density(valid_slopes), col = "darkblue", lwd = 2)
+```
+The distribution of slopes (change in death rates) is somewhat normally distributed, although we have a large leftward skew
+
+
+```{r}
+#plot the upwards trend countries ()
+upward_countries <- c("Zimbabwe", "Lesotho", "Philippines", "Libya", "Uzbekistan")
+
+for (country in upward_countries) {
+  country_data <- data[data$Entity == country, ]
+  
+  plot(
+    country_data$Year, country_data$Total_Deaths, 
+    type = "o",
+    col = "blue",
+    pch = 16,
+    lwd = 2,
+    xlab = "Year", 
+    ylab = "Total Deaths (per 100,000)",
+    main = paste("Total Deaths Due to Pollution in", country),
+    cex.main = 1.5,
+    cex.lab = 1.2,  
+    cex.axis = 1 
+  )
+}
+
+#lesotho is landlocked by south africa, so I want to see how this looks in South Africa
+country_data <- data[data$Entity == "South Africa", ]
+plot(
+    country_data$Year, country_data$Total_Deaths, 
+    type = "o",
+    col = "blue",
+    pch = 16,
+    lwd = 2,
+    xlab = "Year", 
+    ylab = "Total Deaths (per 100,000)",
+    main = paste("Total Deaths Due to Pollution in South Africa"),
+    cex.main = 1.5,
+    cex.lab = 1.2,  
+    cex.axis = 1 
+  )
+
+```
+
+
+Now that we've identified some countries that have a trend different from expected, compare neighboring countries of these. Classifying these countries manually seemed a lot easier than other methods, so going to do that. However, they were not linear relationships and Libya was really the only one that was still increasing. So instead of continuing with linear regression, gonna do clustering instead
+```{r}
+neighbors <- list(
+  "Libya" = c("Tunisia", "Algeria", "Egypt", "Niger", "Chad", "Sudan"),
+  "Zimbabwe" = c("Zambia", "Mozambique", "Namibia", "Botswana", "South Africa"),
+  "Lesotho" = c("South Africa", "Eswatini"),
+  "Uzbekistan" = c("Turkmenistan", "Afghanistan", "Tajikistan", "Kyrgyzstan", "Kazakhstan"),
+  "Philippines" = c("Malaysia", "Brunei", "Taiwan", "Indonesia")
+)
+
+all_countries <- unique(c(upward_trend$Country, unlist(neighbors)))
+cluster_data <- data[data$Entity %in% all_countries, ]
+
+cluster_features <- cluster_data[, c("Indoor_Deaths", "Outdoor_PM_Deaths", "Outdoor_Ozone_Deaths")]
+cluster_features <- na.omit(cluster_features)
+
+cluster_features_scaled <- scale(cluster_features)
+
+
+set.seed(123)
+kmeans_result <- kmeans(cluster_features_scaled, centers = 3)
+cluster_data$Cluster <- kmeans_result$cluster
+
+table(cluster_data$Entity, cluster_data$Cluster)
+
+aggregate(cluster_features, by = list(Cluster = kmeans_result$cluster), mean)
+
+```
+In this data, we create 3 clusters, cluster 1 representing countries with predominantly Indoor pollution related deaths, cluster 2 representing more Outdoor related, and 3 representing a mixture of both. The goal here was to see if neighboring countries were in the same clusters as the ones who had an upwards trend. 
+Zambia, Mozambique", "Namibia", "Botswana", "South Africa
+
+Libya (Cluster 3): Same cluster as 2/6 neighbors (Tunisia, Algeria) Different from 4/6 (Niger, Chad, Egypt, Sudan)
+Zimbabwe (Cluster 1): Same cluster as 3/5 (Mozambique, Zambia, Namibia), different from 2/5 (Botswana, South Africa)
+Lesotho (Cluster 1): Same cluster as 0/1 (South Africa) (Eswatini not in dataset)
+Uzbekistan (Cluster 2): Same cluster as 1/5 (Turkmenistan) different from 4/5 (Afghanistan, Tajikistan, Kyrgyzstan, and Kazakhstan)
+Phillippines (Cluster 3): Same cluster as 4/4 (Malaysia, Brunei, Taiwan, Indonesia)
+
+```{r}
+# Ensure Cluster is a factor
+cluster_data$Cluster <- as.factor(cluster_data$Cluster)
+
+# ANOVA for Indoor Pollution Deaths
+anova_indoor <- aov(Indoor_Deaths ~ Cluster, data = cluster_data)
+summary(anova_indoor)
+
+# Post-hoc test for Indoor Pollution
+if (summary(anova_indoor)[[1]][["Pr(>F)"]][1] < 0.05) {
+  print(TukeyHSD(anova_indoor))
+}
+
+# ANOVA for Outdoor PM Pollution Deaths
+anova_pm <- aov(Outdoor_PM_Deaths ~ Cluster, data = cluster_data)
+summary(anova_pm)
+
+# Post-hoc test for Outdoor PM Pollution
+if (summary(anova_pm)[[1]][["Pr(>F)"]][1] < 0.05) {
+  print(TukeyHSD(anova_pm))
+}
+
+# ANOVA for Outdoor Ozone Pollution Deaths
+anova_ozone <- aov(Outdoor_Ozone_Deaths ~ Cluster, data = cluster_data)
+summary(anova_ozone)
+
+# Post-hoc test for Outdoor Ozone Pollution
+if (summary(anova_ozone)[[1]][["Pr(>F)"]][1] < 0.05) {
+  print(TukeyHSD(anova_ozone))
+}
+```
+probably going to remove this cell from the analysis, it just states that the different clusters are significantly different from each other, which is pretty obvious and would kind of make our results useless if there was any doubt that this was not the case
+
+
+```{r}
+data$Neighbor_Indoor <- NA
+data$Neighbor_PM <- NA
+data$Neighbor_Ozone <- NA
+
+for (country in names(neighbors)) {
+  neighbor_list <- neighbors[[country]]
+  
+  neighbor_data <- data[data$Entity %in% neighbor_list, ]
+  
+  if (nrow(neighbor_data) > 0) {
+    data$Neighbor_Indoor[data$Entity == country] <- mean(neighbor_data$Indoor_Deaths, na.rm = TRUE)
+    data$Neighbor_PM[data$Entity == country] <- mean(neighbor_data$Outdoor_PM_Deaths, na.rm = TRUE)
+    data$Neighbor_Ozone[data$Entity == country] <- mean(neighbor_data$Outdoor_Ozone_Deaths, na.rm = TRUE)
+  }
+}
+
+spearman_indoor <- cor(data$Indoor_Deaths, data$Neighbor_Indoor, method = "spearman", use = "complete.obs")
+spearman_pm <- cor(data$Outdoor_PM_Deaths, data$Neighbor_PM, method = "spearman", use = "complete.obs")
+spearman_ozone <- cor(data$Outdoor_Ozone_Deaths, data$Neighbor_Ozone, method = "spearman", use = "complete.obs")
+
+# Print results
+cat("Spearman Correlation with Neighbors:\n",
+    "Indoor Deaths:", spearman_indoor, "\n",
+    "Outdoor PM Deaths:", spearman_pm, "\n",
+    "Outdoor Ozone Deaths:", spearman_ozone, "\n")
+```
+**(This was only done on the subset of countries that had an increasing average trend in deaths per 100000)**
+From this data, we get a very low indoor death spearman correation, which suggests that there is a basically no correlation between one country's indoor death rates and its neighbors, which suggests that indoor pollution deaths are heavily influenced by localized factors like household energy sources and individual country policies. (which is to be expected) We get a value of .891 for outdoor deaths, which indicates that there's a high correlation between one country's outdoor deaths and their neighbors, which could be affected by air pollution moving across borders or shared industrial zones. The ozone deaths have a value of 0.5, which indicates some correlation between neighbors and country, which could be attributed to something like similar industrial emissions between countries.
+
+
+```{r}
+for (country in upward_countries) {
+  country_data <- data[data$Entity == country, ]
+  
+  latest_year <- max(country_data$Year, na.rm = TRUE)
+  latest_data <- country_data[country_data$Year == latest_year, ]
+  
+  indoor_deaths <- latest_data$Indoor_Deaths
+  neighbor_indoor <- latest_data$Neighbor_Indoor
+  
+  pm_deaths <- latest_data$Outdoor_PM_Deaths
+  neighbor_pm <- latest_data$Neighbor_PM
+  
+  ozone_deaths <- latest_data$Outdoor_Ozone_Deaths
+  neighbor_ozone <- latest_data$Neighbor_Ozone
+  
+  cat("\nCountry:", country, "\n")
+  cat("Year:", latest_year, "\n")
+  cat("Indoor Deaths:", indoor_deaths, "Neighbor Average:", neighbor_indoor, "\n")
+  cat("Outdoor PM Deaths:", pm_deaths, "Neighbor Average:", neighbor_pm, "\n")
+  cat("Outdoor Ozone Deaths:", ozone_deaths, "Neighbor Average:", neighbor_ozone, "\n")
+  cat("---------------------------------------------\n")
+}
+
+```
+
+```{r}
+
+# Set parameters for permutation
+num_iterations <- 1000
+permutation_correlations <- matrix(NA, nrow = num_iterations, ncol = 3)
+colnames(permutation_correlations) <- c("Indoor", "PM", "Ozone")
+
+# Get list of all countries
+all_countries <- unique(data$Entity)
+
+# Calculate observed correlations (from original code)
+observed_correlations <- c(Indoor = spearman_indoor, PM = spearman_pm, Ozone = spearman_ozone)
+print("Observed Spearman Correlations:")
+print(observed_correlations)
+
+set.seed(456) 
+for (i in 1:num_iterations) {
+  # Shuffle the Entity column
+  shuffled_entities <- sample(data$Entity)
+  
+  shuffled_data <- data
+  shuffled_data$Entity <- shuffled_entities
+  
+  # Recompute Neighbor_Indoor, Neighbor_PM, Neighbor_Ozone with shuffled entities
+  shuffled_data$Neighbor_Indoor <- NA
+  shuffled_data$Neighbor_PM <- NA
+  shuffled_data$Neighbor_Ozone <- NA
+  
+  for (country in names(neighbors)) {
+    neighbor_list <- neighbors[[country]]
+    
+    # Get shuffled neighbors by matching the shuffled entities
+    # Find the positions of the original neighbor names in the shuffled_entities
+    # This assumes that neighbor_list contains unique country names
+    neighbor_indices <- match(neighbor_list, shuffled_data$Entity)
+    valid_indices <- neighbor_indices[!is.na(neighbor_indices)]
+    neighbor_shuffled_data <- shuffled_data[valid_indices, ]
+    
+    if (nrow(neighbor_shuffled_data) > 0) {
+      shuffled_data$Neighbor_Indoor[shuffled_data$Entity == country] <- mean(neighbor_shuffled_data$Indoor_Deaths, na.rm = TRUE)
+      shuffled_data$Neighbor_PM[shuffled_data$Entity == country] <- mean(neighbor_shuffled_data$Outdoor_PM_Deaths, na.rm = TRUE)
+      shuffled_data$Neighbor_Ozone[shuffled_data$Entity == country] <- mean(neighbor_shuffled_data$Outdoor_Ozone_Deaths, na.rm = TRUE)
+    }
+  }
+  
+  # Compute Spearman correlations with shuffled neighbors
+  perm_indoor <- cor(shuffled_data$Indoor_Deaths, shuffled_data$Neighbor_Indoor, method = "spearman", use = "complete.obs")
+  perm_pm <- cor(shuffled_data$Outdoor_PM_Deaths, shuffled_data$Neighbor_PM, method = "spearman", use = "complete.obs")
+  perm_ozone <- cor(shuffled_data$Outdoor_Ozone_Deaths, shuffled_data$Neighbor_Ozone, method = "spearman", use = "complete.obs")
+  
+  permutation_correlations[i, ] <- c(perm_indoor, perm_pm, perm_ozone)
+}
+
+p_values <- sapply(1:3, function(j) {
+  if (observed_correlations[j] > 0) {
+    mean(permutation_correlations[, j] >= observed_correlations[j], na.rm = TRUE)
+  } else {
+    mean(permutation_correlations[, j] <= observed_correlations[j], na.rm = TRUE)
+  }
+})
+
+names(p_values) <- c("Indoor", "PM", "Ozone")
+print("P-values from Permutation Test:")
+print(p_values)
+
+```
