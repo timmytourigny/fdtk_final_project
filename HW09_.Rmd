@@ -1,0 +1,617 @@
+---
+title: "Homework 09"
+author: "Tourigny, Timmy; Chandra, Arnav; Misiorek, Ty"
+date: 'Due: Fri Dec 06 | 11:59pm'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+**APMA 3150 \| Fall 2024 \| University of Virginia**
+
+***"On my honor, I pledge that I have neither given nor received unauthorized aid on this assignment." - The author of this RMarkdown file.***
+
+<!--- Solution Region --->
+
+```{css solution-region, echo=FALSE}
+.solution {
+    background-color: #232D4B10;
+    border-style: solid;
+    border-color: #232D4B;
+    padding: .5em;
+    margin: 20px
+}
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
+
+# [Group Work Guideline]{style="color:#0066CC"}
+
+### Overall objectives
+- Teach and learn from your peers (leverage opportunity offered by our physical presence).
+- Improve learning/grade of all your teammates.
+
+### Specific goals for teamwork sessions (what)
+- Every team member should gain a good understanding of each problem and its solution.
+- Discuss any thoughts triggered by problems that can enhance learning.
+- Submit one homework solution per team.
+
+### Methods (how)
+1. Meet each other: names, year in program, degree, hometown, anything else of interest; Learn names.
+2. Choose scribe (to write the team solution) and each team member should take a turn as scribe.
+3. Choose moderator (cut off discussions/watch time); each team member should take a turn as moderator.
+4. Pass individual homework solutions in a circle, so that each team member has read other team members’ homework solutions and is thus aware of the starting set from which your team discussions will follow.
+5. Make two passes through all problems of the assignment:
+    + Pass 1: Focus on deriving answer for the scribe to write into the team homework submission.
+    + Pass 2: Go back through each problem and discuss any thoughts triggered by the problem (e.g., discuss assumptions required for formulas and what happens if they do not hold; this will enhance conceptual learning).
+6. While executing Pass 1, let’s say for a problem, two members have one answer, and the third member (MVP) has a different answer. First determine which answer is correct. Let’s say the 2-member answer was correct. Do not have just one of the 2 members explain the steps taken to reach the answer to the MVP while the other two members engage in other activities. If you listen to your peer, you may find her/his reasoning to be different from yours, which improves your own understanding. Or you may find your way of reasoning to be easier for the MVP to follow. Therefore stay engaged.
+7. One conversation at a time. No side bars. Stay fully engaged in the team conversation.
+8. No multi-tasking (if a discussion is running too long, lean in, and bring conversation to an end).
+
+### Motivation (why)
+- Increased learning occurs when talking about what you have learned, and through teaching.
+- Importance placed on teamwork and communications skills by companies.
+
+# [Goodness-of-fit for discrete distribution]{style="color:#0066CC"}
+
+## [Part 1 - Review]{style="color:#0066CC"}
+This part is for chi-squared goodness-of-fit test for categorical data. Tests whether a sample fits a multinomial distribution with specified probabilities for k possible outcomes.
+
+*Example from Verzani textbook*
+Suppose the percentages are 35% Republican, 35% Democrat, 30% undecided. A survey of 100 voters shows the numbers to be 35, 40, 25. Does this sample fit the multinomial distribution?
+
+See Pearson's chi-sq statistic in [49] stat-techniques.pdf, Devore 14.1, Verzani p.146-148 & Ch.10
+```{r}
+y <- c(35,40,25)            # Actual number of observations
+n <- sum(y)                 # Total number of observations
+expected <- c(35,35,30)     # Expected number of observations
+p <- expected/n             # Expected probabilities
+
+chi2_statistic <- sum( (y-n*p)^2/(n*p) )
+chi2_statistic
+
+## Compute the cumulative dist function P(chi-squared <= chi2_statistic)
+pchisq(chi2_statistic,df=3-1, lower.tail=TRUE)
+
+# The following is P(chi-squared > chi2_statistic) which is also the p-value of our Hypothesis test
+pchisq(chi2_statistic,df=3-1, lower.tail=FALSE)
+
+# We could have achieved the same with chisq.test(). For chisq.test() see Verzani p.338
+chisq.test(y,p=p)
+```
+
+We cannot reject the null hypothesis that the sample indicates that the population distribution is multinomial with the specified 35%-35%-30% probabilities.
+
+## [Part 2 - Kolmogorov-Smirnov test]{style="color:#0066CC"}
+
+Kolmogorov-Smirnov test, Verzani 10.3
+
+We need to install `stats` package first, and you may see empirical distribution item 37 in stat-techniques.pdf
+
+A simple way to plot an empirical cumulative distribution function is `ecdf()`
+```{r}
+library(stats)
+library(MASS)
+SP500sort <- sort(SP500)
+plot(ecdf(SP500sort)) # There are so many points that it looks continuous
+```
+
+Now generate a sample from a normal distribution and plot the empirical cumulative function
+```{r}
+norm_sample <- rnorm(1000, mean=3, sd=2)
+plot(ecdf(norm_sample),pch = ".")
+
+# Get the range of the sample
+range_sample = range(norm_sample)
+
+## Compare our sample with the plot of pdf of a normal(0,2)
+points <- seq(range_sample[1],range_sample[2], 0.1)
+norm_cdf <- pnorm(points, mean=0, sd=2)
+lines(points,norm_cdf, col = "blue")
+
+# Test the hypothesis that norm_sample is a sample from normal(0,2)
+ks.test(norm_sample, "pnorm", mean=0, sd=2)
+
+# Now test that a sample is indeed from a N(3,2) distribution, plot the pdf of a normal(3,2)
+points <- seq(range_sample[1], range_sample[2], 0.01)
+norm_cdf <- pnorm(points, mean=3, sd=2)
+lines(points,norm_cdf, col = "red")
+ks.test(norm_sample,"pnorm",mean=3, sd=2)
+```
+
+## [Part 3 - Shapiro-Wilk test]{style="color:#0066CC"}
+Now we are going to test for normality of a distribution. For a normality test we use the Shapiro-Wilk test. We cannot use Kolmogorov–Smirnov (KS) to test for normality unless we know the parameters (expected value and variance) of the underlying distribution. That means we CANNOT use `mean(x)` and `sd(x)` from the sample as parameters for KS test. The test statistics D is not distributed as KS anymore.
+
+Verzani 10.3, p.358. stat-techniques.pdf item 63.
+```{r}
+shapiro.test(norm_sample)
+```
+
+### [Step 1]{style="color:#0066CC"}
+```{r}
+F100 <- ecdf(norm_sample)  # similar to density
+plot(F100)
+
+# find the x-values
+head(knots(F100))
+# or
+head(sort(norm_sample))
+
+points <- seq(range_sample[1], range_sample[2], 0.01)
+norm_cdf<- pnorm(points, mean=5, sd=2)
+lines(points, norm_cdf, col="blue")
+```
+
+### [Step 2]{style="color:#0066CC"}
+Try exponential distributed data:
+```{r}
+exp_sample <- rexp(100, rate=1)
+
+ks.test(exp_sample, "pnorm", mean=0, sd=2) # vs normal distribution 
+
+ks.test(exp_sample, "pexp", rate=1) # vs exponential distribution 
+```
+
+### [Step 3]{style="color:#0066CC"}
+Now apply KS method to S&P500 yields problem:
+```{r}
+ks.test(SP500, "pexp", rate=1)
+```
+
+Wee have a warning message, so we will remove the ties:
+```{r}
+jittered_yields <- jitter(SP500) # to remove ties
+
+ks.test(jittered_yields, "pexp", rate=1)
+
+ks.test(jittered_yields, "pt", df=4.5)
+```
+We get p-value < 2.2e-16. **WAIT!! Should we reject null hypothesis that it is t4.5 ?!**
+
+What are we missing? - We need to compare the **t-scores** with the reference probability distribution.
+```{r}
+# The previous linear regression model
+n<-length(SP500)
+tscore<-qt(((1:n)-.5)/n,4.5)
+sortSP500<-sort(SP500)
+fit<-lm(sortSP500~tscore)
+coef<-fit$coefficients
+
+test_sample <- (jittered_yields-coef[1])/coef[2]
+
+ks.test(test_sample, "pt", df=4.5)
+```
+
+We will additionally do the KS tests for `test_sample` with several reference probability distributions.
+```{r}
+ks.test(test_sample, "pt", df=5)
+
+ks.test(test_sample, "pt", df=6)
+
+ks.test(test_sample, "pt", df=4)
+
+ks.test(test_sample, "pexp", rate=1)
+
+ks.test(test_sample, "pnorm", mean=0, sd=4.5/2.5)
+```
+
+# [Problems]{style="color:#FF7F50"}
+
+## Part I
+
+### Problem 1 (1)
+
+You will look at Apple stock yields from 2010 to 2021. Please download the file "AAPL-2010-2021.csv" and put it under the same folder where this RMarkDown is. Run the following code:
+
+```{r}
+Yields = read.csv("AAPL-2010-2021.csv", header = TRUE)
+Y = Yields[,1]
+head(Y)
+n = length(Y)
+```
+Y contains Apple yields from January 2010 to December 2021.
+
+Are Apple yields normally distributed? Please make a quantile-quantile graph and answer this question using your judgement.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+qqnorm(Y, main = "Q-Q Plot of Apple Yields")
+qqline(Y, col = "red")
+
+```
+
+Your answer: No, it is not normally distributed
+
+### Problem 1 (2)
+
+Assume the model Y = a + b*T. Find the best degree of freedom (with two decimals) for T distribution based on the correlation with Apple yields.
+
+#### {.solution}
+```{r}
+# List of df
+df = seq(1,10,.01)
+
+# Number of df
+m = length(df)
+m
+
+# Vector for correlations
+tdistcor = rep(NA,m)
+sorted_Y <- sort(Y)
+
+for (i in seq_along(df)) {
+  probabilities = ((1:n) - 0.5) / n
+  t_quantiles = qt(probabilities, df[i])
+    tdistcor[i] = cor(sorted_Y, t_quantiles)
+}
+
+
+# Best degree of freedom
+best_df = df[which.max(tdistcor)]
+best_df
+
+```
+
+Your answer: 3,92
+
+### Problem 1 (3)
+
+Find the coefficients a and b in the model Y = a + b*T.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+t_quantiles = qt(((1:n) - 0.5) / n, df = best_df)
+
+# Linear model
+fit = lm(sorted_Y ~ t_quantiles)
+coefficients = fit$coefficients
+coefficients
+
+```
+
+Your answer:a = .104, b = .012
+
+### Problem 1 (4)
+
+Plot the quantiles for the model Y = a + b*T versus the quantiles of the sample (sample quantiles), and include the abline from the linear model. 
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+plot(t_quantiles, sorted_Y, main = "Quantile Plot with Linear Fit", xlab = "Theoretical Quantiles", ylab = "Sample Quantiles")
+abline(fit, col = "blue")
+
+```
+
+### Problem 1 (5)
+
+Compute the autocorrelation with lag = 1 for the Apple yields.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+lag1_autocorrelation = acf(sorted_Y, lag.max = 1, plot = FALSE)$acf[2]
+lag1_autocorrelation
+
+
+```
+
+Your answer: 0.9822355
+
+### Problem 1 (6)
+
+Design an hypothesis test with significance level alpha = 0.01 (i.e. 1%) to test whether Apple yields are autocorrelated with lag = 1, by running a bootstrap simulation with n = 10,000 simulations. Compute the critical region.
+
+#### {.solution}
+```{r}
+set.seed(1)
+# Type your code here, and Knit.
+set.seed(1)
+n_simulations = 10000
+boot_acf = numeric(n_simulations)
+
+for (i in 1:n_simulations) {
+  boot_sample = sample(sorted_Y, replace = TRUE)
+  boot_acf[i] = acf(boot_sample, lag.max = 1, plot = FALSE)$acf[2]
+}
+
+# Critical region for alpha = 0.01
+alpha = 0.01
+critical_value = quantile(boot_acf, probs = c(alpha / 2, 1 - alpha / 2))
+critical_value
+
+
+```
+
+Your answer: -0.04676108  0.04634300  
+
+### Problem 1 (7)
+
+According to the test result from Problem 1 (6), write the conclusion.
+
+#### {.solution}
+Your answer: The observed value is out of the range, so we reject the null hypothesis and conclude that the Apple yields are significantly autocorrelated at the 1% significance level.
+
+### Problem 1 (8)
+
+Based on the result of the test, can you use the model Y = a + b*T to generate weekly yield? 
+
+#### {.solution}
+Your answer: The model is not applicable for generating weekly yields
+
+### Problem 2 (1)
+
+`mtcars` dataset contains information on 32 automobiles reported in the 1974 Motor Trend magazine. 
+
+First, execute the following chunk:
+```{r,message=FALSE}
+head(mtcars)
+dim_mtcars = dim(mtcars) 
+n1 = dim_mtcars[1] # n1 is the number of cars
+n1  
+```
+
+Use linear regression to predict miles per gallon from a car weight (lb/1,000) --> mpg = a + b*wt. Show the regression line on a `mpg` vs `wt` plot, and find a and b.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+Your answer: 
+
+### Problem 2 (2)
+
+Find the coefficient of determination (i.e. R-squared).
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+Your answer: 
+
+### Problem 2 (3)
+
+Find a 95% confidence interval for R-squared.
+
+You will need to boostrap pairs (`mpg`, `wt`). So, first, run the following:
+```{r}
+mm = mtcars[,c(1,6)]
+head(mm)  # mm is made of pairs (mpg,wt)
+```
+
+#### {.solution}
+```{r}
+set.seed(1234)
+# Part 1: Run a Bootstrap with 1000 simulations, in each simulation you need to compute the coefficient of determination (i.e. R squared). 
+# Type your code here, and Knit.
+
+
+# Part 2: Plot the histogram of all R squared
+# Type your code here, and Knit.
+
+
+# Part 3: Determine the 95% confidence interval for R-squared
+# Type your code here, and Knit.
+
+```
+
+Your answer: 
+
+### Problem 3 (1)
+
+In this problem, we will look at a data vector called `breakdown`.
+```{r}
+breakdown = c(41.53,18.73,2.99,30.34,12.33,117.52,73.02,223.63,4.00,26.78)
+```
+
+Plot a histogram of breakdown. Can we use a `t.test()` to test a hypothesis about the mean of the population from which the breakdown sample is drawn? Explain why or why not do you think t test is appropriate.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+Your answer: 
+
+### Problem 3 (2)
+
+Using the empirical distribution of breakdown, what is the cumulative probability that the time to breakdown is less than 27?
+
+Hint: you may use the empirical cumulative distribution function `ecdf()`.
+
+#### {.solution}
+```{r}
+library(stats)
+# Type your code here, and Knit.
+
+```
+
+Your answer: 
+
+### Problem 3 (3)
+
+Plot the empirical distribution of breakdown using `plot()`.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+### Problem 3 (4)
+
+Draw 1000 bootstrap samples from breakdown and find mean value of each sample. Plot histogram and qqnorm plot side-by-side ( histogram on the left and the other qqnorm plot on the right) by specifying `par(mfrow=c(1,2))`.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+### Problem 3 (5)
+
+Run a goodness-of-fit test to check if the mean values of the bootstrap samples follows a normal distribution. Show the test result. What conclusion do you draw from the result (e.g. p-value)?
+
+Recall: In SP500 case study, we have seen the Shapiro-Wilk’s test or Shapiro test (see https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/shapiro.test), which is a normality test in frequentist statistics. The null hypothesis of Shapiro’s test is that the population is distributed normally. It is among the three tests for normality designed for detecting all kinds of departure from normality. If the value of p is equal to or less than 0.05, then the hypothesis of normality will be rejected by the Shapiro test. On failing, the test can state that the data will not fit the distribution normally with 95% confidence. However, on passing, the test can state that there exists no significant departure from normality. 
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+Your answer: 
+
+## Part II
+
+### Problem 1 (1)
+
+Imagine that you are conducting a survey on the best season: summer, fall, winter, or spring. You take a poll from a sample of UVA students asking which season is their favorite. You might wonder whether the students' votes are equally distributed between the 4 seasons.
+
+First, some data:
+```{r}
+votes = c(summer=71, fall=20, winter=25, spring=62)
+votes
+```
+
+Calculate the observed proportions by dividing each observation by the sample size
+```{r}
+N = sum(votes)  # total number of observations
+votes_freq = votes/N
+```
+
+Now, calculate the expected frequencies. Assume each season has an equally likely probability of being chosen as a favorite.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+### Problem 1 (2)
+Calculate the chi-squared statistic without using advanced functions. This requires only 1 line of code.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+### Problem 1 (3)
+What is the degrees of freedom `df` in this chi-squared test?
+
+Hint: `df = k-1`, where k is the number of categories.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+### Problem 1 (4)
+Perform a chi-squared test using `chisq.test()`.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+### Problem 1 (5)
+Is the test significant at alpha = 0.05? 
+
+Hint: find its p-value.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+Your answer:
+
+### Problem 1 (6)
+Is the data normally distributed? Use a Shapiro-Wilk test to determine. 
+
+Hint: what is the p-value? Therefore the data is normally distributed or not?
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+Your answer: 
+
+### Problem 2 (1)
+
+We will use the Kolmogorov-Smirnov test to compare two empirical distributions from two different samples, the goal is to know whether the two samples are from the same distribution.
+
+The data set `stud.recs` in `UsingR` package contains math and verbal scores for some students (`sat.m` and `sat.v`). Assuming that the two samples are independent, we need to investigate whether the two samples from the same population of scores?
+
+```{r message=FALSE}
+library(UsingR)
+sat.m <- stud.recs$sat.m
+sat.v <- stud.recs$sat.v
+```
+
+Plot the qqplot, boxplot, ecdf for both scores.
+
+#### {.solution}
+```{r}
+par(mfrow=c(2,2))
+# Type your code here, and Knit.
+## 1) Plot the qqplot for both
+
+
+## 2) Plot the boxplot both
+
+
+## 3) Plot the empirical distribution of sat.m and sat.v
+## use plot for the first one and lines for the second one
+
+```
+
+### Problem 2 (2)
+Run a KS test to answer the question: Do `sat.v` and `sat.m` have the same distribution?
+  
+#### {.solution}
+Step 1 - Write the null-hypothesis: ??????
+
+Step 2 - Write the alternative hypothesis: ??????
+
+```{r}
+# Type your code here, and Knit.
+
+```
+
+### Problem 2 (3)
+Question: are `sat.m` and `sat.v` from a normal distribution?
+
+Hint: Run a Shapiro-Wilk test for `sat.m` and then another one for `sat.v`.
+
+#### {.solution}
+```{r}
+# Type your code here, and Knit.
+
+```
+
+Your answer: 
