@@ -369,10 +369,18 @@ Use linear regression to predict miles per gallon from a car weight (lb/1,000) -
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
+linear_model <- lm(mpg ~ wt, data = mtcars)
+a <- coef(model)[1]
+b <- coef(model)[2]
+
+plot(mtcars$wt, mtcars$mpg, main="mpg vs wt", xlab = "wt", ylab="mpg")
+abline(linear_model, col="blue")
+a
+b
 
 ```
 
-Your answer: 
+Your answer: a: 0.4337892, b:0.407994 
 
 ### Problem 2 (2)
 
@@ -381,10 +389,12 @@ Find the coefficient of determination (i.e. R-squared).
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
+r2 <- summary(linear_model)$r.squared
+r2
 
 ```
 
-Your answer: 
+Your answer: 0.7528328
 
 ### Problem 2 (3)
 
@@ -401,18 +411,26 @@ head(mm)  # mm is made of pairs (mpg,wt)
 set.seed(1234)
 # Part 1: Run a Bootstrap with 1000 simulations, in each simulation you need to compute the coefficient of determination (i.e. R squared). 
 # Type your code here, and Knit.
+n <- 1000
+r_list <- numeric(n)
+for(i in 1:n) {
+  sample <- mm[sample(nrow(mm), replace = TRUE),]
+  model <- lm(mpg ~ wt, data = sample)
+  r_list[i] <- summary(model)$r.squared
+}
 
 
 # Part 2: Plot the histogram of all R squared
 # Type your code here, and Knit.
-
+hist(r_list, main="Bootstrapped Distribution", xlab = "R Squared")
 
 # Part 3: Determine the 95% confidence interval for R-squared
 # Type your code here, and Knit.
-
+ci <- quantile(r_list, c(0.025, 0.975))
+ci
 ```
 
-Your answer: 
+Your answer: [0.6379510 0.8589202 ]
 
 ### Problem 3 (1)
 
@@ -426,10 +444,11 @@ Plot a histogram of breakdown. Can we use a `t.test()` to test a hypothesis abou
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
+hist(breakdown, main="Breakdown Histogram", xlab ="time")
 
 ```
 
-Your answer: 
+Your answer: T-test is not appropriate because this data is not approximately normal
 
 ### Problem 3 (2)
 
@@ -440,11 +459,13 @@ Hint: you may use the empirical cumulative distribution function `ecdf()`.
 #### {.solution}
 ```{r}
 library(stats)
-# Type your code here, and Knit.
+cdf <- ecdf(breakdown)
+p <- cdf(27)
+p
 
 ```
 
-Your answer: 
+Your answer: 0.5
 
 ### Problem 3 (3)
 
@@ -453,6 +474,7 @@ Plot the empirical distribution of breakdown using `plot()`.
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
+plot(cdf, main="CDF of Breakdown", xlab="Time", ylab="Cumulative Probability", col="red")
 
 ```
 
@@ -463,6 +485,19 @@ Draw 1000 bootstrap samples from breakdown and find mean value of each sample. P
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
+set.seed(123)
+n <- 1000
+bootstrapped_means <- numeric(n)
+
+for(i in 1:n) {
+  sample <- sample(breakdown, replace=TRUE)
+  bootstrapped_means[i] <- mean(sample)
+}
+
+par(mfrow = c(1,2))
+hist(bootstrapped_means, main="Bootstrapped Means", xlab="mean",col="red")
+qqnorm(bootstrapped_means, main="QQ Plot for Bootstrapped Means")
+qqline(bootstrapped_means, col="red")
 
 ```
 
@@ -475,10 +510,11 @@ Recall: In SP500 case study, we have seen the Shapiro-Wilk’s test or Shapiro t
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
-
+test <- shapiro.test(bootstrapped_means)
+test
 ```
 
-Your answer: 
+Your answer: Since our p-value is less than the significance level 0.05 (1.101e-08), we reject the null hypothesis. Thus, we can conlcude that this data is not normally distributed.
 
 ## Part II
 
@@ -496,6 +532,7 @@ Calculate the observed proportions by dividing each observation by the sample si
 ```{r}
 N = sum(votes)  # total number of observations
 votes_freq = votes/N
+votes_freq
 ```
 
 Now, calculate the expected frequencies. Assume each season has an equally likely probability of being chosen as a favorite.
@@ -503,6 +540,8 @@ Now, calculate the expected frequencies. Assume each season has an equally likel
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
+expected <- rep(N / length(votes), length(votes))
+expected
 
 ```
 
@@ -512,7 +551,8 @@ Calculate the chi-squared statistic without using advanced functions. This requi
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
-
+chi <- sum((votes - expected)^2 / expected)
+chi
 ```
 
 ### Problem 1 (3)
@@ -523,7 +563,8 @@ Hint: `df = k-1`, where k is the number of categories.
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
-
+df <- length(votes) - 1
+df
 ```
 
 ### Problem 1 (4)
@@ -532,6 +573,8 @@ Perform a chi-squared test using `chisq.test()`.
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
+chisq_test <- chisq.test(votes, p=rep(1/4, length(votes)))
+chisq_test
 
 ```
 
@@ -543,10 +586,12 @@ Hint: find its p-value.
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
+p <- chisq_test$p.value
+p
 
 ```
 
-Your answer:
+Your answer: Yes, since the p-value 1.07334e-09, is less than the signicance level of 0.05, the test is statistically significant.
 
 ### Problem 1 (6)
 Is the data normally distributed? Use a Shapiro-Wilk test to determine. 
@@ -556,10 +601,12 @@ Hint: what is the p-value? Therefore the data is normally distributed or not?
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
-
+# Type your code here, and Knit.
+test <- shapiro.test(votes)
+test
 ```
 
-Your answer: 
+Your answer: The p value is 0.2381, which is greater than the 0.05 significance level, so this data is normally distributed.
 
 ### Problem 2 (1)
 
@@ -580,26 +627,33 @@ Plot the qqplot, boxplot, ecdf for both scores.
 par(mfrow=c(2,2))
 # Type your code here, and Knit.
 ## 1) Plot the qqplot for both
-
+qqplot(sat.m, sat.v, main = "QQ Plot of sat.m vs sat.v", xlab = "sat.m", ylab = "sat.v", col="red")
+abline(0,1, col="blue")
 
 ## 2) Plot the boxplot both
-
+names <- c("sat.m","sat.v")
+boxplot(sat.m, sat.v, names=names, main = "Boxplots for sat.m and sat.v")
 
 ## 3) Plot the empirical distribution of sat.m and sat.v
 ## use plot for the first one and lines for the second one
-
+ecdfm <- ecdf(sat.m)
+ecdfv <- ecdf(sat.v)
+plot(ecdfm, main = "ECDF for sat.m and sat.v", xlab="Score", ylab = "Cumulative Probability", col="red")
+lines(ecdf(sat.v), col = "blue", lwd = 2)
 ```
 
 ### Problem 2 (2)
 Run a KS test to answer the question: Do `sat.v` and `sat.m` have the same distribution?
   
 #### {.solution}
-Step 1 - Write the null-hypothesis: ??????
+Step 1 - Write the null-hypothesis: sat.v and sat.m have the same distribution
 
-Step 2 - Write the alternative hypothesis: ??????
+Step 2 - Write the alternative hypothesis: sat.v and sat.m have different distribution
 
 ```{r}
 # Type your code here, and Knit.
+ks <- ks.test(sat.m, sat.v)
+ks
 
 ```
 
@@ -611,7 +665,12 @@ Hint: Run a Shapiro-Wilk test for `sat.m` and then another one for `sat.v`.
 #### {.solution}
 ```{r}
 # Type your code here, and Knit.
+shapirom <- shapiro.test(sat.m)
+shapirov <- shapiro.test(sat.v)
+
+shapirom
+shapirov
 
 ```
 
-Your answer: 
+Your answer: Since both p values from the shapiro-wilk test for sat.m and sat.v are greater than the significance level 0.05, we can conclude that both are normally distributed.
