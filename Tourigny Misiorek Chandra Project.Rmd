@@ -1,6 +1,6 @@
 ---
 title: "Final Project"
-author: "Tourigny, Timmy; Misiorek, Ty; Chandra, Amav"
+author: "Tourigny, Timmy; Misiorek, Ty; Chandra, Arnav"
 date: 'Dec 6, 2024'
 output:
   html_document:
@@ -98,7 +98,6 @@ cor(aggregated_data$Year,aggregated_data$Outdoor_Ozone_Deaths)
 ```
 
 ```{r}
-# Aggregate data
 aggregated_data <- aggregate(
   cbind(Total_Deaths, Indoor_Deaths, Outdoor_PM_Deaths, Outdoor_Ozone_Deaths) ~ Year,
   data = data,
@@ -106,7 +105,7 @@ aggregated_data <- aggregate(
   na.rm = TRUE
 )
 
-# Plot and fit a linear model for Total Deaths
+#fit lm for total deaths and years
 model1 <- lm(aggregated_data$Total_Deaths ~ aggregated_data$Year)
 plot(aggregated_data$Year, aggregated_data$Total_Deaths,
      xlab = "Year",
@@ -118,12 +117,11 @@ abline(model1,)
 cat("Total Deaths Slope:", model1$coefficients[2], "\n")
 cat("R-squared for Total Deaths:", summary(model1)$r.squared, "\n")
 
-# Fit linear models for each pollution type
+#fit for each subset of deaths
 model_indoor <- lm(aggregated_data$Indoor_Deaths ~ aggregated_data$Year)
 model_pm <- lm(aggregated_data$Outdoor_PM_Deaths ~ aggregated_data$Year)
 model_ozone <- lm(aggregated_data$Outdoor_Ozone_Deaths ~ aggregated_data$Year)
 
-# Plot Indoor, PM, and Ozone pollution deaths with regression lines
 plot(aggregated_data$Year, aggregated_data$Indoor_Deaths,
      lwd = 2,
      xlab = "Year",
@@ -135,20 +133,19 @@ plot(aggregated_data$Year, aggregated_data$Indoor_Deaths,
 points(aggregated_data$Year, aggregated_data$Outdoor_PM_Deaths, lwd = 2, col = "green")
 points(aggregated_data$Year, aggregated_data$Outdoor_Ozone_Deaths, lwd = 2, col = "blue")
 
-# Add regression lines
+#add regression lines
 abline(model_indoor, )
 abline(model_pm,)
 abline(model_ozone, )
 
-# Add legend
 legend("topright",
        legend = c("Indoor Pollution", "Outdoor PM Pollution", "Outdoor Ozone Pollution"),
        col = c("red", "green", "blue"),
        lwd = 2,
-       lty = c(1, 1, 1), # Line type for solid pollution lines
+       lty = c(1, 1, 1),
        bty = "n")
 
-# Display regression slopes and R-squared values
+#display regression slopes and R-squared values
 cat("Indoor Pollution Slope:", model_indoor$coefficients[2], "\n")
 cat("R-squared for Indoor Pollution:", summary(model_indoor)$r.squared, "\n")
 cat("Outdoor PM Pollution Slope:", model_pm$coefficients[2], "\n")
@@ -197,8 +194,7 @@ count_slopes <- 0
 
 for (i in seq_along(unique_countries)) {
   country_data <- data[data$Entity == unique_countries[i], ]
-  
-  # Fit a linear regression if there is sufficient data
+  #fit lm if enough dawta for that country
   if (nrow(country_data) > 1) {
     model <- lm(Total_Deaths ~ Year, data = country_data)
     slopes[i] <- coef(model)["Year"]
@@ -290,10 +286,60 @@ data <- data %>%
 t_test_result <- t.test(
   Total_Deaths ~ Status, 
   data = data, 
-  var.equal = FALSE, # Use Welch's t-test assuming unequal variances
+  var.equal = FALSE, 
   na.action = na.omit
 )
 print(t_test_result)
 
 ```
 The t-test result suggests that is it almost certain that developing countries are more likely to have higher total death by pollution. 
+
+
+
+```{r}
+#split on median for high vs low death count
+data <- data %>%
+  mutate(High_Deaths = ifelse(Total_Deaths > median(Total_Deaths), "High", "Low"))
+
+# make contingency table and chi square
+contingency_table <- table(data$Status, data$High_Deaths)
+
+# Perform the chi-square test
+chi_square_result <- chisq.test(contingency_table)
+
+developed_low <- contingency_table["Developed", "Low"]
+developed_high <- contingency_table["Developed", "High"]
+developing_low <- contingency_table["Developing", "Low"]
+developing_high <- contingency_table["Developing", "High"]
+
+cat("\nChi-Square Test Results:\n")
+cat("=====================================\n")
+cat("Contingency Table:\n")
+cat("                 Low     High\n")
+cat("Developed:     ", developed_low, "    ", developed_high, "\n")
+cat("Developing:    ", developing_low, "    ", developing_high, "\n")
+cat("\nChi-Square Statistic:      ", round(chi_square_result$statistic, 3), "\n")
+cat("Degrees of Freedom:        ", chi_square_result$parameter, "\n")
+cat("P-value:                   ", format.pval(chi_square_result$p.value, digits = 3), "\n")
+cat("=====================================\n")
+
+
+```
+
+
+```{r}
+data$Status <- ifelse(data$Entity %in% developing_countries, "Developing", "Developed")
+
+developing_data <- data[data$Status == "Developing", ]
+
+indoor_deaths <- sum(developing_data$Indoor_Deaths, na.rm = TRUE)
+outdoor_deaths <- sum(developing_data$Outdoor_PM_Deaths + developing_data$Outdoor_Ozone_Deaths, na.rm = TRUE)
+
+pollution_deaths <- data.frame(
+  Type = c("Indoor", "Outdoor"),
+  Deaths = c(indoor_deaths, outdoor_deaths)
+)
+
+pollution_deaths
+
+```
